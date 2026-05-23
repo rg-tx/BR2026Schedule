@@ -8,6 +8,7 @@ import {
   Clock, ArrowRight, MapPin, ShieldCheck, Info,
   ArrowClockwise, CheckCircle, WarningCircle, ArrowSquareOut,
   CaretRight, Waves, ClipboardText, Radio, UserList,
+  ArrowFatUp, GearSix, CopySimple, X, Link,
 } from "@phosphor-icons/react";
 
 const cn = (...a: Parameters<typeof clsx>) => twMerge(clsx(a));
@@ -33,6 +34,36 @@ type ScheduleBlock = {
 const SHEET_ID = "1KBPmsddghMRosRAf0L31yuiZrcX6XMFboQEelxFayPU";
 const SHEET_CSV_URL  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Schedule`;
 const SHEET_EDIT_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit?usp=sharing`;
+
+// ─── Google Apps Script to deploy on the Sheet ───────────────────────────────
+// Deploy as Web App: Execute as = Me, Who has access = Anyone
+const GAS_SCRIPT = `function doPost(e) {
+  try {
+    const payload = JSON.parse(e.postData.contents);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName('Schedule');
+    if (!sheet) sheet = ss.insertSheet('Schedule');
+    const headers = ['Day','Start','End','Cat','Title','Sub','Lead','Owner'];
+    sheet.clearContents();
+    sheet.getRange(1,1,1,headers.length).setValues([headers]);
+    if (payload.rows && payload.rows.length > 0) {
+      const rows = payload.rows.map(r =>
+        [r.day, r.start, r.end, r.cat, r.title, r.sub, r.lead||'', r.owner||'']
+      );
+      sheet.getRange(2,1,rows.length,headers.length).setValues(rows);
+    }
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true, written: payload.rows.length }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: false, error: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+function doGet() {
+  return ContentService.createTextOutput('Schedule webhook active');
+}`;
 
 // ─── Schedule data ───────────────────────────────────────────────────────────
 
@@ -283,11 +314,13 @@ function BlockRow({
   return (
     <div
       className={cn(
-        "relative flex items-start gap-2.5 px-3 py-2.5 transition-colors",
-        isNow  ? "bg-[color:var(--cat-free-bg)]" : "hover:bg-muted/50",
+        "relative flex items-start gap-2.5 px-3 py-2.5 transition-colors hover:bg-muted/50",
         isPast && "opacity-35",
       )}
-      style={{ borderLeft: `3px solid var(--cat-${block.cat})` }}
+      style={{
+        borderLeft: `3px solid var(--cat-${block.cat})`,
+        background: isNow ? "var(--cat-free-bg)" : undefined,
+      }}
     >
       {/* Category icon chip */}
       <div
@@ -329,9 +362,11 @@ function BlockRow({
               </span>
             )}
             {leader && (
-              <span className="inline-flex items-center gap-1 rounded bg-muted border border-border px-1.5 py-px text-[10px] font-medium text-muted-foreground">
-                <leader.Icon size={9} weight="bold" className="shrink-0 opacity-60" />
-                <span className="truncate max-w-[160px] sm:max-w-[240px]">{leader.names}</span>
+              <span
+                title={`${leader.label}: ${leader.names}`}
+                className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-muted border border-border text-muted-foreground"
+              >
+                <Users size={10} weight="regular" className="shrink-0" />
               </span>
             )}
           </div>
@@ -374,10 +409,9 @@ function TimelineGroup({
         <div
           className={cn(
             "text-[12px] font-medium leading-none tabular-nums",
-            isNow ? "text-[color:var(--cat-free)]" : "text-muted-foreground",
             isPast && "opacity-40",
           )}
-          style={{ fontFamily: "var(--font-mono)" }}
+          style={{ fontFamily: "var(--font-mono)", color: isNow ? "var(--cat-free)" : undefined }}
         >
           {t.h12}{t.min}
         </div>
@@ -424,7 +458,10 @@ function DayPane({
 
   return (
     <div className="bg-card border border-border rounded overflow-hidden">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between px-3 py-2 border-b border-border bg-muted/30">
+      <div
+        className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between px-3 py-2 border-b border-border bg-muted/30"
+        style={{ borderLeft: "4px solid var(--cat-activity)" }}
+      >
         <div className="flex items-center gap-2">
           <span className="text-[13px] font-semibold text-foreground tracking-tight">{d.full}</span>
           <span
@@ -565,7 +602,7 @@ function LeadersPanel({ dayIdx }: { dayIdx: number }) {
   return (
     <SidePanel>
       <SidePanelHeader
-        icon={<UserList size={11} weight="bold" />}
+        icon={<UserList size={11} weight="bold" style={{ color: "var(--cat-spirit)" }} />}
         title="Leaders on Point"
         count={keys.length}
       />
@@ -612,7 +649,7 @@ function QuickReferencePanel() {
   return (
     <SidePanel>
       <SidePanelHeader
-        icon={<Info size={11} weight="bold" />}
+        icon={<Info size={11} weight="bold" style={{ color: "var(--cat-free)" }} />}
         title="Quick Reference"
       />
       <div className="divide-y divide-border">
@@ -620,8 +657,8 @@ function QuickReferencePanel() {
           <div key={k} className="flex items-center justify-between px-3 py-1.5 gap-4">
             <span className="text-[12px] text-muted-foreground">{k}</span>
             <span
-              className="text-[11px] text-foreground font-medium text-right"
-              style={{ fontFamily: "var(--font-mono)" }}
+              className="text-[11px] font-medium text-right"
+              style={{ fontFamily: "var(--font-mono)", color: "var(--cat-free-text)" }}
             >
               {v}
             </span>
@@ -672,6 +709,161 @@ function SafetyPanel() {
   );
 }
 
+// ─── WebhookSetupPanel ───────────────────────────────────────────────────────
+
+function WebhookSetupPanel({
+  webhookUrl, onSave, onClose,
+}: { webhookUrl: string; onSave: (url: string) => void; onClose: () => void }) {
+  const [draft, setDraft] = useState(webhookUrl);
+
+  const copyScript = () => {
+    navigator.clipboard.writeText(GAS_SCRIPT).then(() => {
+      toast.success("Script copied — paste it into Apps Script editor");
+    });
+  };
+
+  return (
+    <div className="border-b border-border bg-card">
+      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-3 flex flex-col gap-3">
+
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <Link size={11} weight="bold" />
+            Push to Sheet — Webhook Setup
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+            <X size={14} weight="bold" />
+          </button>
+        </div>
+
+        {/* Steps */}
+        <ol className="flex flex-col gap-2 text-[12px] text-muted-foreground">
+          <li className="flex items-start gap-2">
+            <span
+              className="shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold mt-px"
+              style={{ background: "var(--cat-free-bg)", color: "var(--cat-free-text)" }}
+            >1</span>
+            <span>Open your Google Sheet → <strong className="text-foreground">Extensions → Apps Script</strong></span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span
+              className="shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold mt-px"
+              style={{ background: "var(--cat-free-bg)", color: "var(--cat-free-text)" }}
+            >2</span>
+            <span>Paste the script below, then click <strong className="text-foreground">Deploy → New deployment → Web App</strong>. Set <em>Execute as = Me</em> and <em>Who has access = Anyone</em>.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span
+              className="shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold mt-px"
+              style={{ background: "var(--cat-free-bg)", color: "var(--cat-free-text)" }}
+            >3</span>
+            <span>Copy the <strong className="text-foreground">Web App URL</strong> and paste it below, then save.</span>
+          </li>
+        </ol>
+
+        {/* Script copy */}
+        <div className="flex items-center gap-2">
+          <div
+            className="flex-1 truncate text-[10px] text-muted-foreground border border-border rounded px-2 py-1.5 min-w-0"
+            style={{ fontFamily: "var(--font-mono)", background: "var(--muted)" }}
+          >
+            function doPost(e) {"{"} … {"}"}
+          </div>
+          <button
+            onClick={copyScript}
+            className="inline-flex items-center gap-1.5 border border-border rounded px-2 py-1.5 text-[11px] font-medium text-foreground bg-card hover:bg-muted transition-colors cursor-pointer shrink-0"
+          >
+            <CopySimple size={11} weight="bold" />
+            Copy Script
+          </button>
+        </div>
+
+        {/* URL input + save */}
+        <div className="flex items-center gap-2">
+          <input
+            type="url"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            placeholder="https://script.google.com/macros/s/…/exec"
+            className="flex-1 min-w-0 border border-border rounded px-2 py-1.5 text-[12px] text-foreground bg-card placeholder:text-muted-foreground outline-none focus:border-foreground transition-colors"
+            style={{ fontFamily: "var(--font-mono)" }}
+          />
+          <button
+            onClick={() => { onSave(draft.trim()); onClose(); }}
+            disabled={!draft.trim()}
+            className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-[11px] font-semibold transition-colors cursor-pointer shrink-0 disabled:opacity-40"
+            style={{ background: "var(--foreground)", color: "var(--background)" }}
+          >
+            <CheckCircle size={11} weight="bold" />
+            Save URL
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ─── PushButton ──────────────────────────────────────────────────────────────
+
+function PushButton({
+  status, lastPush, hasWebhook, onPush, onSetup,
+}: {
+  status: SyncStatus;
+  lastPush: Date | null;
+  hasWebhook: boolean;
+  onPush: () => void;
+  onSetup: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={hasWebhook ? onPush : onSetup}
+        disabled={status === "loading"}
+        className={cn(
+          "inline-flex items-center gap-1.5 border rounded px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer bg-card",
+          status === "loading" && "opacity-60 cursor-wait",
+        )}
+        style={
+          !hasWebhook
+            ? { borderColor: "var(--border)", color: "var(--muted-foreground)" }
+            : status === "error"
+            ? { borderColor: "var(--cat-milestone)", color: "var(--cat-milestone-text)" }
+            : status === "success"
+            ? { borderColor: "var(--cat-activity)", color: "var(--cat-activity-text)" }
+            : { borderColor: "var(--cat-spirit)", color: "var(--cat-spirit-text)" }
+        }
+      >
+        {status === "loading"  ? <ArrowClockwise size={11} weight="bold" className="animate-spin shrink-0" />
+         : status === "success" ? <CheckCircle    size={11} weight="bold" className="shrink-0" />
+         : status === "error"   ? <WarningCircle  size={11} weight="bold" className="shrink-0" />
+         : !hasWebhook          ? <GearSix        size={11} weight="bold" className="shrink-0" />
+         : <ArrowFatUp          size={11} weight="bold" className="shrink-0" />}
+        {status === "loading" ? "Pushing…"
+         : status === "success" ? "Pushed"
+         : status === "error"   ? "Push failed"
+         : !hasWebhook          ? "Setup push"
+         : "Push to Sheet"}
+      </button>
+      {hasWebhook && lastPush && status !== "loading" && (
+        <span className="text-[10px] text-muted-foreground" style={{ fontFamily: "var(--font-mono)" }}>
+          {lastPush.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+        </span>
+      )}
+      {hasWebhook && (
+        <button
+          onClick={onSetup}
+          title="Edit webhook URL"
+          className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+        >
+          <GearSix size={11} weight="bold" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── SyncButton ──────────────────────────────────────────────────────────────
 
 type SyncStatus = "idle" | "loading" | "success" | "error";
@@ -685,14 +877,16 @@ function SyncButton({
         onClick={onSync}
         disabled={status === "loading"}
         className={cn(
-          "inline-flex items-center gap-1.5 border rounded px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer",
-          status === "error"
-            ? "bg-card border-[color:var(--cat-milestone)] text-[color:var(--cat-milestone-text)]"
-            : status === "success"
-            ? "bg-card border-[color:var(--cat-activity)] text-[color:var(--cat-activity-text)]"
-            : "bg-card border-border text-foreground hover:border-muted-foreground",
+          "inline-flex items-center gap-1.5 border rounded px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer bg-card",
           status === "loading" && "opacity-60 cursor-wait",
         )}
+        style={
+          status === "error"
+            ? { borderColor: "var(--cat-milestone)", color: "var(--cat-milestone-text)" }
+            : status === "success"
+            ? { borderColor: "var(--cat-activity)", color: "var(--cat-activity-text)" }
+            : {}
+        }
       >
         {status === "loading"  ? <ArrowClockwise size={11} weight="bold" className="animate-spin shrink-0" />
          : status === "success" ? <CheckCircle    size={11} weight="bold" className="shrink-0" />
@@ -726,6 +920,10 @@ export default function App() {
   const [schedule, setSchedule]     = useState<ScheduleBlock[]>(DEFAULT_SCHEDULE);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
   const [lastSync, setLastSync]     = useState<Date | null>(null);
+  const [webhookUrl, setWebhookUrl] = useState<string>(() => localStorage.getItem("schedule-webhook-url") ?? "");
+  const [pushStatus, setPushStatus] = useState<SyncStatus>("idle");
+  const [lastPush, setLastPush]     = useState<Date | null>(null);
+  const [showWebhookSetup, setShowWebhookSetup] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 30_000);
@@ -762,6 +960,43 @@ export default function App() {
     }
   };
 
+  const saveWebhookUrl = (url: string) => {
+    setWebhookUrl(url);
+    localStorage.setItem("schedule-webhook-url", url);
+    if (url) toast.success("Webhook URL saved");
+  };
+
+  const handlePush = async () => {
+    if (!webhookUrl) { setShowWebhookSetup(true); return; }
+    setPushStatus("loading");
+    try {
+      const rows = schedule.map(b => ({
+        day:   b.day + 1,
+        start: b.start,
+        end:   b.end,
+        cat:   b.cat,
+        title: b.title,
+        sub:   b.sub,
+        lead:  b.lead  ?? "",
+        owner: b.owner ?? "",
+      }));
+      // Use text/plain to avoid CORS preflight; GAS can still parse e.postData.contents
+      await fetch(webhookUrl, {
+        method:   "POST",
+        headers:  { "Content-Type": "text/plain;charset=utf-8" },
+        body:     JSON.stringify({ rows }),
+        redirect: "follow",
+        mode:     "no-cors", // GAS redirects strip CORS; fire-and-forget is fine
+      });
+      setLastPush(new Date());
+      setPushStatus("success");
+      toast.success(`Pushed ${rows.length} events to Sheet`, { duration: 5000 });
+    } catch (err: unknown) {
+      setPushStatus("error");
+      toast.error(`Push failed: ${err instanceof Error ? err.message : "Network error"}`, { duration: 7000 });
+    }
+  };
+
   return (
     <div
       className="min-h-screen bg-background text-foreground"
@@ -771,10 +1006,12 @@ export default function App() {
 
       {/* ── Toolbar ──────────────────────────────────────────────────── */}
       <header className="bg-card border-b border-border sticky top-0 z-20">
+        {/* Brand accent strip — color from --cat-milestone in theme.css */}
+        <div style={{ height: "3px", background: "var(--cat-milestone)" }} />
         <div className="max-w-[1200px] mx-auto px-4 sm:px-6 h-10 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 min-w-0">
             <div className="flex items-center gap-1.5 text-[12px] font-semibold text-foreground">
-              <MapPin size={12} weight="fill" className="text-muted-foreground shrink-0" />
+              <MapPin size={12} weight="fill" style={{ color: "var(--cat-milestone)" }} className="shrink-0" />
               <span className="hidden sm:inline text-muted-foreground font-normal">Restoration Ranch ·</span>
               <span>2026 High Adventure</span>
             </div>
@@ -784,8 +1021,17 @@ export default function App() {
             </span>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <SyncButton status={syncStatus} lastSync={lastSync} onSync={handleSync} />
+            {/* Divider */}
+            <div className="w-px h-4 bg-border shrink-0" />
+            <PushButton
+              status={pushStatus}
+              lastPush={lastPush}
+              hasWebhook={!!webhookUrl}
+              onPush={handlePush}
+              onSetup={() => setShowWebhookSetup(v => !v)}
+            />
             <div
               className="hidden sm:flex items-center gap-1.5 bg-muted rounded px-2 py-1 text-[11px] font-medium text-foreground"
               style={{ fontFamily: "var(--font-mono)" }}
@@ -796,6 +1042,15 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {/* ── Webhook setup panel (slides in below toolbar) ─────────── */}
+      {showWebhookSetup && (
+        <WebhookSetupPanel
+          webhookUrl={webhookUrl}
+          onSave={saveWebhookUrl}
+          onClose={() => setShowWebhookSetup(false)}
+        />
+      )}
 
       {/* ── Page body ────────────────────────────────────────────────── */}
       <div className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-3 pb-20">
@@ -811,11 +1066,12 @@ export default function App() {
                   key={i}
                   onClick={() => setCurrentDay(i)}
                   className={cn(
-                    "relative flex flex-col items-start px-4 py-2.5 shrink-0 transition-colors cursor-pointer border-0 font-[inherit] border-b-2",
+                    "relative flex flex-col items-start px-4 py-2.5 shrink-0 transition-colors cursor-pointer font-[inherit]",
                     isActive
-                      ? "border-b-foreground text-foreground bg-transparent"
-                      : "border-b-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40",
+                      ? "text-foreground bg-transparent"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/40",
                   )}
+                  style={{ borderBottom: isActive ? "2px solid var(--cat-free)" : "2px solid transparent" }}
                 >
                   {isToday && (
                     <span
@@ -823,7 +1079,12 @@ export default function App() {
                       style={{ background: "var(--cat-free)" }}
                     />
                   )}
-                  <span className="text-[13px] font-semibold leading-none">{d.short}</span>
+                  <span
+                    className="text-[13px] font-semibold leading-none"
+                    style={isActive ? { color: "var(--cat-free-text)" } : {}}
+                  >
+                    {d.short}
+                  </span>
                   <span
                     className="text-[10px] mt-0.5 opacity-55"
                     style={{ fontFamily: "var(--font-mono)" }}
