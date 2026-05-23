@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "dev": "vite"
+    "dev": "vite",
+    "deploy": "vite build && wrangler deploy",
+    "preview:cf": "wrangler dev"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",

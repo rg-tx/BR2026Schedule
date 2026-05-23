@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 .vite/
+.wrangler/
 
 # OS
 .DS_Store
@@ -18,8 +19,5 @@ dist/
 # Apps Script project).
 .clasprc.json
 
-# Lockfiles — project is set up for pnpm (see pnpm-workspace.yaml and
-# pnpm.overrides in package.json); ignore npm/yarn lockfiles to keep history
-# clean if someone runs the wrong tool. Commit pnpm-lock.yaml when present.
-package-lock.json
+# Yarn lockfile — this project uses npm or pnpm.
 yarn.lock

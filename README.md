@@ -7,6 +7,16 @@ Two front-ends for the same Bonds Ranch 2026 trip schedule:
 
 The original Figma project: <https://www.figma.com/design/bP1V3LlpOOMuKF7jb5kkzF/Review-daily-schedule-app>.
 
+## Live site
+
+**<https://review-daily-schedule.rmgtx.workers.dev>** — the React app, hosted on Cloudflare Workers (static assets only, served from the global edge).
+
+Deploys happen automatically on push to `main` via the [GitHub Actions workflow](.github/workflows/deploy.yml). To deploy manually:
+
+```sh
+npm run deploy        # vite build && wrangler deploy
+```
+
 ## Running the React app
 
 ```sh
@@ -56,6 +66,25 @@ Both the React app and the Apps Script web app read from:
 <https://docs.google.com/spreadsheets/d/1KBPmsddghMRosRAf0L31yuiZrcX6XMFboQEelxFayPU/edit>
 
 The `Schedule` tab is the canonical data — columns: `Day · Start · End · Cat · Title · Sub · Lead · Owner`.
+
+## Hosting (Cloudflare Workers)
+
+Configured via [`wrangler.jsonc`](wrangler.jsonc) using the [Static Assets pattern](https://developers.cloudflare.com/workers/static-assets/) — no Worker code, just `dist/` served from the edge with SPA-style 404 fallback to `index.html`.
+
+### Auto-deploy from GitHub
+
+The [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) workflow runs on every push to `main` and on manual dispatch. One-time setup per fresh clone:
+
+1. Create a Cloudflare API token: <https://dash.cloudflare.com/profile/api-tokens> → **Create Token** → **Edit Cloudflare Workers** template.
+2. Add it to this repo: **Settings → Secrets and variables → Actions → New repository secret**, name `CLOUDFLARE_API_TOKEN`.
+3. Next push to `main` triggers a deploy. Watch it under the repo's **Actions** tab.
+
+### Manual deploy from a local checkout
+
+```sh
+wrangler login        # one-time, OAuth in browser
+npm run deploy        # builds with Vite, then `wrangler deploy`
+```
 
 ## Docs
 

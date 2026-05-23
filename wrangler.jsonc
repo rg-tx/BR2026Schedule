@@ -1,0 +1,27 @@
+/**
+ * Cloudflare Workers configuration for the static React SPA.
+ *
+ * No Worker code — this is the "Static Assets only" pattern. Wrangler serves
+ * the contents of ./dist (Vite build output) from Cloudflare's edge.
+ *
+ * `not_found_handling: "single-page-application"` makes any request that
+ * doesn't match a static asset return /index.html with a 200, so client-side
+ * routing works. (We don't have routing yet, but this is the right default.)
+ *
+ * Deploy:   pnpm run build && wrangler deploy
+ * Dev URL:  https://review-daily-schedule.<your-subdomain>.workers.dev
+ *
+ * Docs: https://developers.cloudflare.com/workers/static-assets/
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "review-daily-schedule",
+  "compatibility_date": "2026-05-23",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

@@ -1,0 +1,44 @@
+name: Deploy to Cloudflare Workers
+
+# Auto-deploy the Vite-built React app to Cloudflare Workers (static assets)
+# on every push to main. Manual dispatch is also enabled for ad-hoc redeploys.
+#
+# One-time setup (per repo):
+#   1. Create a Cloudflare API token at
+#      https://dash.cloudflare.com/profile/api-tokens
+#      → "Create Token" → "Edit Cloudflare Workers" template
+#   2. In this repo: Settings → Secrets and variables → Actions → New
+#      repository secret → name: CLOUDFLARE_API_TOKEN, value: <token>
+#   3. (No need to set CLOUDFLARE_ACCOUNT_ID — wrangler.jsonc + the token are
+#      sufficient since the token is scoped to the account.)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: 44ff032b8eebb7328ed6ac547efa80a7
+          command: deploy
