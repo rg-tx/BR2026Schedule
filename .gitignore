@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.vite/
+
+# OS
+.DS_Store
+*.log
+
+# Editor
+.idea/
+.vscode/
+
+# Clasp — local OAuth credentials live at ~/.clasprc.json (outside repo) and
+# auth/state files. The repo-level .clasp.json IS committed (it binds to the
+# Apps Script project).
+.clasprc.json
+
+# Lockfiles — project is set up for pnpm (see pnpm-workspace.yaml and
+# pnpm.overrides in package.json); ignore npm/yarn lockfiles to keep history
+# clean if someone runs the wrong tool. Commit pnpm-lock.yaml when present.
+package-lock.json
+yarn.lock

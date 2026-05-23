@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Clasp wiring + push UI removal — Decisions</title>
+<style>
+  :root{
+    --bg:#fafaf9; --fg:#1a1a1a; --muted:#6a6a6a; --line:#e7e5e4;
+    --card:#ffffff; --accent:#0d99ff; --accent-soft:#e3f1ff;
+    --amber:#fff7e6; --amber-line:#f5d58a; --amber-text:#7a5300;
+    --blue:#eff6ff;   --blue-line:#bcdcfb;  --blue-text:#0a4a8a;
+    --green:#f0faf2;  --green-line:#bde6c8; --green-text:#0f6a2c;
+    --danger:#b42318;
+    --mono:'SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px;line-height:1.45}
+  .wrap{max-width:780px;margin:0 auto;padding:32px 20px 140px}
+  header{margin-bottom:28px}
+  h1{font-size:22px;font-weight:700;letter-spacing:-0.02em;margin:0 0 8px}
+  .lede{color:var(--muted);font-size:13.5px;max-width:64ch;margin:0 0 10px}
+  .meta{color:var(--muted);font-size:11px;font-family:var(--mono)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:18px 18px 14px;margin-bottom:14px}
+  .card h2{font-size:14.5px;font-weight:600;margin:0 0 4px;letter-spacing:-0.01em}
+  .qnum{display:inline-block;font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-right:6px;letter-spacing:0.04em}
+  .helper{color:var(--muted);font-size:12.5px;margin:0 0 12px;max-width:62ch}
+  .context{border-radius:6px;padding:9px 11px;margin:0 0 12px;font-size:12.5px;line-height:1.45}
+  .context.amber{background:var(--amber);border:1px solid var(--amber-line);color:var(--amber-text)}
+  .context.blue{background:var(--blue);border:1px solid var(--blue-line);color:var(--blue-text)}
+  .context.green{background:var(--green);border:1px solid var(--green-line);color:var(--green-text)}
+  .context strong{font-weight:600}
+  .options{display:flex;flex-direction:column;gap:6px;margin:0 0 10px}
+  .opt{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--line);border-radius:6px;padding:10px 12px;cursor:pointer;background:var(--card);transition:border-color .12s,background .12s}
+  .opt:hover{border-color:#c0bfbd;background:#fcfcfa}
+  .opt input{margin:3px 0 0 0;cursor:pointer;flex-shrink:0}
+  .opt input:checked + .opt-body .opt-label{color:var(--accent)}
+  .opt-body{flex:1;min-width:0}
+  .opt-label{font-weight:500;font-size:13.5px}
+  .opt-rec{display:inline-block;margin-left:6px;font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;font-weight:600}
+  .opt-cons{display:block;color:var(--muted);font-size:12px;margin-top:2px;line-height:1.4}
+  .opt-deep{border-color:#d4d4d4;background:#fafaf9}
+  .opt-deep .opt-label{font-style:italic;color:#444}
+  .freetext{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+  .freetext label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:600}
+  .freetext input[type=text], .freetext textarea{
+    width:100%;border:1px solid var(--line);border-radius:5px;padding:8px 10px;font-family:var(--sans);font-size:13px;background:#fff;color:var(--fg);outline:none;transition:border-color .12s;
+  }
+  .freetext input[type=text]:focus, .freetext textarea:focus{border-color:var(--accent)}
+  .freetext textarea{resize:vertical;min-height:48px;font-family:var(--mono);font-size:12px}
+  .freetext.deep-detail input[type=text]{background:#fafaf9}
+  footer{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,0.96);backdrop-filter:blur(8px);border-top:1px solid var(--line);padding:14px 20px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+  footer .hint{font-size:11.5px;color:var(--muted)}
+  button.copy{appearance:none;border:none;background:var(--fg);color:#fff;padding:10px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);transition:transform .08s,background .12s}
+  button.copy:hover{background:#000}
+  button.copy:active{transform:translateY(1px)}
+  .toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:8px 14px;border-radius:6px;font-size:12.5px;opacity:0;pointer-events:none;transition:opacity .18s}
+  .toast.show{opacity:1}
+  .fallback{margin-top:10px;display:none}
+  .fallback textarea{width:100%;min-height:160px;font-family:var(--mono);font-size:11.5px;padding:10px;border:1px solid var(--line);border-radius:6px}
+  .pill{display:inline-block;font-family:var(--mono);font-size:10px;background:var(--accent-soft);color:var(--accent);padding:1px 6px;border-radius:3px;letter-spacing:0.04em;text-transform:uppercase;font-weight:600;margin-left:6px;vertical-align:1px}
+  code{font-family:var(--mono);font-size:12px;background:#f4f4f3;padding:1px 4px;border-radius:3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Clasp wiring + push UI removal</h1>
+    <p class="lede">
+      Six decisions to wire up <code>@google/clasp</code> so the Apps Script for the Bonds Ranch schedule sheet lives in the repo,
+      and to strip the "Setup push" affordance from the toolbar. Some choices cascade — Q4 depends on Q1, and Q2 needs a Script ID
+      if you've already deployed the script once. Every card has a <em>🔍 Sub-agent deep dive</em> option and a free-text escape hatch.
+    </p>
+    <p class="meta">docs/decisions/decision-sheet-2026-05-23-clasp-push-ui.html · 2026-05-23</p>
+  </header>
+
+  <!-- ─── Q1 ─────────────────────────────────────────────────────────────── -->
+  <div class="card" data-qid="q1">
+    <h2><span class="qnum">Q1</span>How far should the push-to-sheet UI come out?</h2>
+    <p class="helper">"Setup push" is the gear-icon button shown when no webhook URL is saved. It opens the 3-step Apps Script deploy panel. The button morphs into "Push to Sheet" once a URL is saved. You said you don't want "Setup push" in the UI — this question pins down how much of the push apparatus goes with it.</p>
+    <div class="context amber">
+      <strong>Trade-off:</strong> If the entire push UI goes, the React app can no longer write back to the sheet —
+      the sheet stays source of truth and the app is pull-only. Clasp pushes the <em>script code</em> to Apps Script, but doesn't sync row data.
+      You'd edit the sheet directly (or via the Apps Script editor) to change the schedule. The "Sync Sheet" pull button stays either way.
+    </div>
+    <div class="options" data-question="How far should the push-to-sheet UI come out?">
+      <label class="opt"><input type="radio" name="q1" value="Remove all of it" data-default="1" />
+        <span class="opt-body"><span class="opt-label">Remove all of it<span class="opt-rec">Recommended</span></span>
+          <span class="opt-cons">Yank <code>PushButton</code>, <code>WebhookSetupPanel</code>, the inline <code>GAS_SCRIPT</code> const, <code>handlePush</code>, push state, the toolbar divider. Cleanest read. Sheet is the only writeable surface.</span></span></label>
+      <label class="opt"><input type="radio" name="q1" value="Hide Setup variant only; keep Push to Sheet if URL saved" />
+        <span class="opt-body"><span class="opt-label">Hide "Setup push" variant only; keep "Push to Sheet" if URL already saved</span>
+          <span class="opt-cons">Button is hidden when <code>!hasWebhook</code>. Saved URLs (or one seeded via DevTools) still allow push. No in-app way to set it.</span></span></label>
+      <label class="opt"><input type="radio" name="q1" value="Keep Push to Sheet + gear; hide panel behind dev shortcut" />
+        <span class="opt-body"><span class="opt-label">Keep "Push to Sheet" + gear; hide setup panel behind a dev-only keyboard shortcut</span>
+          <span class="opt-cons">Toolbar looks clean. Panel only opens via e.g. <code>⌘K</code> or a query-string flag. Useful if you want to keep pushing during development.</span></span></label>
+      <label class="opt opt-deep"><input type="radio" name="q1" value="🔍 Sub-agent deep dive" />
+        <span class="opt-body"><span class="opt-label">🔍 Sub-agent deep dive</span>
+          <span class="opt-cons">Dispatch a sub-agent to map every code path that depends on the push flow before I decide. (Helpful if you're unsure what breaks.)</span></span></label>
+    </div>
+    <div class="freetext deep-detail">
+      <label for="q1-deep">If "Sub-agent deep dive" — what to investigate (optional)</label>
+      <input type="text" id="q1-deep" placeholder="e.g. confirm no other component reads handlePush or webhookUrl" />
+    </div>
+    <div class="freetext">
+      <label for="q1-free">Something else (free text)</label>
+      <input type="text" id="q1-free" placeholder="Your own answer — overrides the radio above" />
+    </div>
+  </div>
+
+  <!-- ─── Q2 ─────────────────────────────────────────────────────────────── -->
+  <div class="card" data-qid="q2">
+    <h2><span class="qnum">Q2</span>Apps Script project — does one already exist for this sheet?</h2>
+    <p class="helper">Clasp needs to know whether to <em>bind</em> to an existing Apps Script project or <em>create</em> a fresh one parented to the sheet.</p>
+    <div class="context blue">
+      <strong>How to tell:</strong> open the sheet → <code>Extensions → Apps Script</code>. If you see code already there (the <code>doPost</code> function or anything else), a project exists — copy its Script ID from the editor URL (the long string between <code>/projects/</code> and <code>/edit</code>) and paste below.
+      If the editor is empty/never opened, pick "Create new".
+    </div>
+    <div class="options" data-question="Apps Script project — does one already exist for this sheet?">
+      <label class="opt"><input type="radio" name="q2" value="Bind to existing — Script ID provided" />
+        <span class="opt-body"><span class="opt-label">Bind to existing — I'll paste the Script ID below</span>
+          <span class="opt-cons">I'll write <code>.clasp.json</code> with that ID. <code>clasp pull</code> first to capture anything already in the project, then push our managed file.</span></span></label>
+      <label class="opt"><input type="radio" name="q2" value="Create new bound script" data-default="1" />
+        <span class="opt-body"><span class="opt-label">Create new — run <code>clasp create --type sheets --parentId 1KBPmsd…</code><span class="opt-rec">Recommended if you haven't deployed yet</span></span>
+          <span class="opt-cons">Fresh bound Apps Script project, parented to your sheet. You'll see browser OAuth on first <code>clasp login</code>.</span></span></label>
+      <label class="opt"><input type="radio" name="q2" value="Scaffold only — I'll do clasp create/clone myself" />
+        <span class="opt-body"><span class="opt-label">Scaffold the folder + <code>.claspignore</code> only — I'll handle <code>clasp create</code>/<code>clone</code> myself</span>
+          <span class="opt-cons">Safest if you want full control over the OAuth and project-creation flow.</span></span></label>
+      <label class="opt opt-deep"><input type="radio" name="q2" value="🔍 Sub-agent deep dive" />
+        <span class="opt-body"><span class="opt-label">🔍 Sub-agent deep dive</span>
+          <span class="opt-cons">Have a sub-agent look up clasp's exact behavior with the sheet's parent ID and document the safest binding sequence.</span></span></label>
+    </div>
+    <div class="freetext">
+      <label for="q2-scriptid">Script ID (only if "Bind to existing")</label>
+      <input type="text" id="q2-scriptid" placeholder="1abc…xyz (from script.google.com/.../projects/&lt;HERE&gt;/edit)" />
+    </div>
+    <div class="freetext deep-detail">
+      <label for="q2-deep">If "Sub-agent deep dive" — what to investigate (optional)</label>
+      <input type="text" id="q2-deep" placeholder="e.g. confirm clasp 3.x works on macOS Sequoia and supports container-bound creation" />
+    </div>
+    <div class="freetext">
+      <label for="q2-free">Something else (free text)</label>
+      <input type="text" id="q2-free" placeholder="Your own answer — overrides the radio above" />
+    </div>
+  </div>
+
+  <!-- ─── Q3 ─────────────────────────────────────────────────────────────── -->
+  <div class="card" data-qid="q3">
+    <h2><span class="qnum">Q3</span>Where should the GAS source live in the repo?</h2>
+    <p class="helper">Where to drop <code>Schedule.gs</code> + <code>appsscript.json</code> (the clasp-managed sources). Convention only — clasp doesn't care.</p>
+    <div class="options" data-question="Where should the GAS source live in the repo?">
+      <label class="opt"><input type="radio" name="q3" value="gas/" data-default="1" />
+        <span class="opt-body"><span class="opt-label"><code>gas/</code><span class="opt-rec">Recommended</span></span>
+          <span class="opt-cons">Short, common in clasp tutorials. Quick to type.</span></span></label>
+      <label class="opt"><input type="radio" name="q3" value="apps-script/" />
+        <span class="opt-body"><span class="opt-label"><code>apps-script/</code></span>
+          <span class="opt-cons">Matches the menu name in Google Sheets. More descriptive.</span></span></label>
+      <label class="opt"><input type="radio" name="q3" value="scripts/" />
+        <span class="opt-body"><span class="opt-label"><code>scripts/</code></span>
+          <span class="opt-cons">Generic — leaves room for other (non-GAS) scripts later.</span></span></label>
+      <label class="opt opt-deep"><input type="radio" name="q3" value="🔍 Sub-agent deep dive" />
+        <span class="opt-body"><span class="opt-label">🔍 Sub-agent deep dive</span>
+          <span class="opt-cons">(Probably overkill for this one.)</span></span></label>
+    </div>
+    <div class="freetext">
+      <label for="q3-free">Something else (free text)</label>
+      <input type="text" id="q3-free" placeholder="e.g. server/, gscript/" />
+    </div>
+  </div>
+
+  <!-- ─── Q4 ─────────────────────────────────────────────────────────────── -->
+  <div class="card" data-qid="q4">
+    <h2><span class="qnum">Q4</span>What to do with the inline <code>GAS_SCRIPT</code> const in App.tsx?</h2>
+    <p class="helper">App.tsx:40–66 holds the Apps Script source as a template literal — its only consumer is the "Copy Script" button in the panel. If the panel goes (Q1=remove all), this becomes dead code. If the panel stays in any form, the const matters.</p>
+    <div class="context green">
+      <strong>Cascade:</strong> If you picked "Remove all of it" on Q1, the safe default is <em>delete</em>. If you kept any push UI, pick the Vite <code>?raw</code> import option — that way the inline string and the clasp-managed <code>.gs</code> file can never drift.
+    </div>
+    <div class="options" data-question="What to do with the inline GAS_SCRIPT const in App.tsx?">
+      <label class="opt"><input type="radio" name="q4" value="Delete it (only valid if Q1=remove all)" data-default="1" />
+        <span class="opt-body"><span class="opt-label">Delete it<span class="opt-rec">If Q1 = remove all</span></span>
+          <span class="opt-cons">Drops ~28 lines from App.tsx. Removes the duplicate source of truth.</span></span></label>
+      <label class="opt"><input type="radio" name="q4" value="Replace with Vite ?raw import from gas/Schedule.gs" />
+        <span class="opt-body"><span class="opt-label">Replace with Vite <code>?raw</code> import from the clasp-managed <code>.gs</code> file</span>
+          <span class="opt-cons">Best answer if any push UI survives — one source of truth (the <code>.gs</code> file), inline copy stays in sync.</span></span></label>
+      <label class="opt"><input type="radio" name="q4" value="Move to a separate src/gasScript.ts file" />
+        <span class="opt-body"><span class="opt-label">Move to a separate <code>src/gasScript.ts</code> file</span>
+          <span class="opt-cons">Smaller App.tsx, but two copies of the script can still drift.</span></span></label>
+      <label class="opt opt-deep"><input type="radio" name="q4" value="🔍 Sub-agent deep dive" />
+        <span class="opt-body"><span class="opt-label">🔍 Sub-agent deep dive</span>
+          <span class="opt-cons">Confirm whether Vite 6.3 supports <code>?raw</code> for files outside <code>src/</code> without extra plugin config.</span></span></label>
+    </div>
+    <div class="freetext deep-detail">
+      <label for="q4-deep">If "Sub-agent deep dive" — what to investigate (optional)</label>
+      <input type="text" id="q4-deep" placeholder="e.g. verify Vite ?raw works for .gs extension or whether we need vite-plugin-raw" />
+    </div>
+    <div class="freetext">
+      <label for="q4-free">Something else (free text)</label>
+      <input type="text" id="q4-free" placeholder="Your own answer — overrides the radio above" />
+    </div>
+  </div>
+
+  <!-- ─── Q5 ─────────────────────────────────────────────────────────────── -->
+  <div class="card" data-qid="q5">
+    <h2><span class="qnum">Q5</span>How should clasp be installed?</h2>
+    <p class="helper">Project uses pnpm. Clasp can be a repo devDep, global install, or run on-demand via <code>pnpm dlx</code>.</p>
+    <div class="options" data-question="How should clasp be installed?">
+      <label class="opt"><input type="radio" name="q5" value="pnpm add -D @google/clasp (devDep)" data-default="1" />
+        <span class="opt-body"><span class="opt-label"><code>pnpm add -D @google/clasp</code><span class="opt-rec">Recommended</span></span>
+          <span class="opt-cons">Locked to repo, reproducible. Run via <code>pnpm clasp …</code> or <code>npx clasp</code>. Adds ~3 MB to <code>node_modules</code>.</span></span></label>
+      <label class="opt"><input type="radio" name="q5" value="Global: pnpm add -g @google/clasp" />
+        <span class="opt-body"><span class="opt-label">Global install — <code>pnpm add -g @google/clasp</code></span>
+          <span class="opt-cons">One install for all projects. Not pinned. Run as <code>clasp …</code> from anywhere.</span></span></label>
+      <label class="opt"><input type="radio" name="q5" value="pnpm dlx @google/clasp per invocation" />
+        <span class="opt-body"><span class="opt-label">Zero-install — <code>pnpm dlx @google/clasp …</code> each time</span>
+          <span class="opt-cons">Nothing to add to the repo. Slower per invocation (downloads on first run).</span></span></label>
+      <label class="opt opt-deep"><input type="radio" name="q5" value="🔍 Sub-agent deep dive" />
+        <span class="opt-body"><span class="opt-label">🔍 Sub-agent deep dive</span>
+          <span class="opt-cons">(Probably overkill.)</span></span></label>
+    </div>
+    <div class="freetext">
+      <label for="q5-free">Something else (free text)</label>
+      <input type="text" id="q5-free" placeholder="e.g. brew install clasp, mise-managed, …" />
+    </div>
+  </div>
+
+  <!-- ─── Q6 ─────────────────────────────────────────────────────────────── -->
+  <div class="card" data-qid="q6">
+    <h2><span class="qnum">Q6</span>After scaffolding — drive the OAuth + initial push myself, or hand off?</h2>
+    <p class="helper">Either I (a) print exact commands and stop, or (b) actually run <code>clasp login</code>, <code>clasp create</code>/<code>clone</code>, and <code>clasp push</code> from this terminal.</p>
+    <div class="context amber">
+      <strong>If "Drive it":</strong> a browser OAuth window will pop up on this machine — you'll need to be at the keyboard to grant access. Apps Script API also has to be enabled at <code>script.google.com/home/usersettings</code> before <code>clasp create</code> works.
+    </div>
+    <div class="options" data-question="After scaffolding — drive the OAuth + initial push myself, or hand off?">
+      <label class="opt"><input type="radio" name="q6" value="Hand off — print commands and stop" data-default="1" />
+        <span class="opt-body"><span class="opt-label">Hand off — print exact commands and stop<span class="opt-rec">Recommended</span></span>
+          <span class="opt-cons">I write everything, leave you a 4-step runbook for the auth-flavored steps. Safest, no surprise OAuth pop-ups.</span></span></label>
+      <label class="opt"><input type="radio" name="q6" value="Drive it from this terminal" />
+        <span class="opt-body"><span class="opt-label">Drive it from this terminal</span>
+          <span class="opt-cons">I run <code>clasp login</code> now and walk through the rest, pausing where I need the Script ID or your "OK".</span></span></label>
+      <label class="opt opt-deep"><input type="radio" name="q6" value="🔍 Sub-agent deep dive" />
+        <span class="opt-body"><span class="opt-label">🔍 Sub-agent deep dive</span>
+          <span class="opt-cons">Have a sub-agent draft the runbook with version-specific gotchas before we decide.</span></span></label>
+    </div>
+    <div class="freetext">
+      <label for="q6-free">Something else (free text)</label>
+      <input type="text" id="q6-free" placeholder="e.g. drive the install + login, then hand off for the OAuth-heavy create step" />
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <span class="hint">Persists in localStorage as you go. Reload-safe.</span>
+  <button class="copy" id="copyBtn">Copy answers as prompt</button>
+</footer>
+<div class="toast" id="toast">Copied — paste into Claude</div>
+<div class="fallback" id="fallback"><textarea readonly></textarea></div>
+
+<script>
+(() => {
+  const STORAGE_KEY = 'decision-sheet-2026-05-23-clasp-push-ui';
+  const FILENAME = 'decision-sheet-2026-05-23-clasp-push-ui.html';
+
+  // Restore from localStorage
+  const restore = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+      Object.entries(saved).forEach(([k, v]) => {
+        if (k.startsWith('radio:')) {
+          const name = k.slice(6);
+          const el = document.querySelector(`input[type=radio][name="${name}"][value="${CSS.escape(v).replace(/\\(.)/g,'$1')}"]`);
+          // Simpler: iterate
+          document.querySelectorAll(`input[type=radio][name="${name}"]`).forEach(r => {
+            if (r.value === v) r.checked = true;
+          });
+        } else if (k.startsWith('text:')) {
+          const id = k.slice(5);
+          const el = document.getElementById(id);
+          if (el) el.value = v;
+        }
+      });
+    } catch (e) { /* ignore */ }
+  };
+
+  // Save on any change
+  const save = () => {
+    const state = {};
+    document.querySelectorAll('input[type=radio]:checked').forEach(r => {
+      state[`radio:${r.name}`] = r.value;
+    });
+    document.querySelectorAll('input[type=text], textarea').forEach(t => {
+      if (t.id && t.value) state[`text:${t.id}`] = t.value;
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  };
+
+  document.addEventListener('change', save);
+  document.addEventListener('input', save);
+
+  // Build answer envelope
+  const buildPayload = () => {
+    const lines = ['DECISION SHEET ANSWERS', `source: ${FILENAME}`, ''];
+    document.querySelectorAll('.card').forEach((card, idx) => {
+      const qid = card.dataset.qid;
+      const num = idx + 1;
+      const qText = card.querySelector('.options').dataset.question;
+      const radio = card.querySelector(`input[type=radio][name="${qid}"]:checked`);
+      const radioVal = radio ? radio.value : '— blank —';
+      const freeEl = card.querySelector(`#${qid}-free`);
+      const freeVal = freeEl && freeEl.value.trim();
+      const deepEl = card.querySelector(`#${qid}-deep`);
+      const deepVal = deepEl && deepEl.value.trim();
+      const scriptIdEl = card.querySelector(`#${qid}-scriptid`);
+      const scriptIdVal = scriptIdEl && scriptIdEl.value.trim();
+
+      lines.push(`Q${num}: ${qText}`);
+      let a;
+      if (freeVal) {
+        a = `${radioVal} — also: ${freeVal}`;
+      } else {
+        a = radioVal;
+      }
+      if (radioVal === '🔍 Sub-agent deep dive' && deepVal) {
+        a = `🔍 Sub-agent deep dive — ${deepVal}`;
+      }
+      if (scriptIdVal) {
+        a += ` (Script ID: ${scriptIdVal})`;
+      }
+      lines.push(`A${num}: ${a}`);
+      lines.push('');
+    });
+    return lines.join('\n').trim() + '\n';
+  };
+
+  const showToast = (msg) => {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 1800);
+  };
+
+  const showFallback = (payload) => {
+    const fb = document.getElementById('fallback');
+    fb.style.display = 'block';
+    const ta = fb.querySelector('textarea');
+    ta.value = payload;
+    ta.focus();
+    ta.select();
+  };
+
+  document.getElementById('copyBtn').addEventListener('click', async () => {
+    const payload = buildPayload();
+    try {
+      await navigator.clipboard.writeText(payload);
+      showToast('Copied — paste into Claude');
+    } catch (e) {
+      showFallback(payload);
+      showToast('Clipboard blocked — select the textarea below');
+    }
+  });
+
+  restore();
+})();
+</script>
+</body>
+</html>

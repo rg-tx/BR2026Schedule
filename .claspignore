@@ -1,0 +1,9 @@
+# Files inside rootDir (./gas) that should NOT be pushed to the Apps Script
+# project. Anything else under gas/ tracks normally.
+#
+# Schedule.gs is a placeholder doPost webhook lifted from the original
+# Figma Make scaffold (App.tsx's inline GAS_SCRIPT). The React app's push UI
+# was removed, so nothing calls it — keeping it as a reference but not
+# deploying it. Delete or push later if you want the webhook live.
+
+Schedule.gs
