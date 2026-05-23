@@ -1,9 +1,8 @@
-# Review daily schedule app
+# BR 2026 Schedule
 
-Two front-ends for the same Bonds Ranch 2026 trip schedule:
+The canonical front-end is the **React/Vite app** (`src/`), hosted on Cloudflare Workers — what Figma Make scaffolded, now managed in this repo. Reads schedule rows from a Google Sheet via the `gviz/csv` endpoint.
 
-1. **React/Vite app** (`src/`) — what Figma Make scaffolded. Reads schedule rows from a Google Sheet via the `gviz/csv` endpoint. Lives in this repo.
-2. **Apps Script Web App** (`gas/`) — a server-rendered HTML version of the same schedule, bound to the same sheet and managed via [`clasp`](https://github.com/google/clasp).
+The `gas/` folder mirrors a Google Apps Script project bound to the same sheet, managed via [`clasp`](https://github.com/google/clasp). It contains a server-rendered HTML version of the schedule (`Code.js` + `Index.html`) and a `formatHousing` utility. The HTML web app was the previous shareable URL but is **retired as a user-facing surface** — keep editing the script for utilities like `formatHousing`, but the React app on Cloudflare is the URL to share.
 
 The original Figma project: <https://www.figma.com/design/bP1V3LlpOOMuKF7jb5kkzF/Review-daily-schedule-app>.
 
