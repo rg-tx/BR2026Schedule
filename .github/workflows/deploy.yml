@@ -25,9 +25,9 @@ jobs:
       contents: read
       deployments: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -37,12 +37,12 @@ jobs:
       - run: npm run build
 
       - name: Deploy to Cloudflare Workers
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: 44ff032b8eebb7328ed6ac547efa80a7
-          # Pin wrangler 4.x — the action's default is 3.90.0, which
-          # doesn't understand the Static Assets config in wrangler.jsonc
+          # Pin wrangler 4.x — the action's default is older and doesn't
+          # understand the Static Assets config in wrangler.jsonc
           # ("Missing entry-point" error). 4.x handles assets-only deploys.
           wranglerVersion: '4'
           command: deploy
