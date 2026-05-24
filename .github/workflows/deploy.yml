@@ -41,4 +41,8 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: 44ff032b8eebb7328ed6ac547efa80a7
+          # Pin wrangler 4.x — the action's default is 3.90.0, which
+          # doesn't understand the Static Assets config in wrangler.jsonc
+          # ("Missing entry-point" error). 4.x handles assets-only deploys.
+          wranglerVersion: '4'
           command: deploy
